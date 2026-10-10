@@ -15,94 +15,85 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class OtpAuthServiceImpl
-        implements OtpAuthService {
+                implements OtpAuthService {
 
-    private final Fast2SmsService fast2SmsService;
-    private final UserRepository userRepository;
-    private final JwtService jwtService;
+        private final Fast2SmsService fast2SmsService;
+        private final UserRepository userRepository;
+        private final JwtService jwtService;
 
-    @Override
-    public void sendOtp(String phone) {
+        @Override
+        public void sendOtp(String phone) {
 
-        String normalizedPhone =
-                normalizePhone(phone);
+                String normalizedPhone = normalizePhone(phone);
 
-        fast2SmsService.sendOtp(
-                normalizedPhone
-        );
-    }
-
-    @Override
-    @Transactional
-    public OtpLoginResponse verifyOtp(
-            String phone,
-            String otp
-    ) {
-
-        String normalizedPhone =
-                normalizePhone(phone);
-
-        // Fast2SMS verifies the OTP
-        fast2SmsService.verifyOtp(
-                normalizedPhone,
-                otp
-        );
-
-        User user =
-                userRepository
-                        .findByPhone(normalizedPhone)
-                        .orElse(null);
-
-        boolean newUser = false;
-
-        if (user == null) {
-
-            user = User.builder()
-                    .phone(normalizedPhone)
-                    .build();
-
-            user = userRepository.save(user);
-
-            newUser = true;
+                fast2SmsService.sendOtp(
+                                normalizedPhone);
         }
 
-        String token =
-                jwtService.generateToken(
-                        normalizedPhone
-                );
+        @Override
+        @Transactional
+        public OtpLoginResponse verifyOtp(
+                        String phone,
+                        String otp) {
 
-        return OtpLoginResponse.builder()
-                .accessToken(token)
-                .userId(user.getId())
-                .phone(user.getPhone())
-                .name(user.getName())
-                .email(user.getEmail())
-                .newUser(newUser)
-                .build();
-    }
+                String normalizedPhone = normalizePhone(phone);
 
-    private String normalizePhone(
-            String phone
-    ) {
+                // Fast2SMS verifies the OTP
+                fast2SmsService.verifyOtp(
+                                normalizedPhone,
+                                otp);
 
-        if (phone == null) {
-            throw new IllegalArgumentException(
-                    "Phone number is required"
-            );
+                User user = userRepository
+                                .findByPhone(normalizedPhone)
+                                .orElse(null);
+
+                boolean newUser = false;
+
+                if (user == null) {
+
+                        user = User.builder()
+                                        .phone(normalizedPhone)
+                                        .build();
+
+                        user = userRepository.save(user);
+
+                        newUser = true;
+                }
+
+                String accessToken = jwtService.generateToken(normalizedPhone);
+
+                String refreshToken = jwtService.generateRefreshToken(normalizedPhone);
+
+                return OtpLoginResponse.builder()
+                                .accessToken(accessToken)
+                                .refreshToken(refreshToken)
+                                .userId(user.getId())
+                                .phone(user.getPhone())
+                                .name(user.getName())
+                                .email(user.getEmail())
+                                .newUser(newUser)
+                                .build();
         }
 
-        String value =
-                phone.replaceAll("\\s+", "");
+        private String normalizePhone(
+                        String phone) {
 
-        if (value.startsWith("+91")) {
-            value = value.substring(3);
+                if (phone == null) {
+                        throw new IllegalArgumentException(
+                                        "Phone number is required");
+                }
+
+                String value = phone.replaceAll("\\s+", "");
+
+                if (value.startsWith("+91")) {
+                        value = value.substring(3);
+                }
+
+                if (value.startsWith("91")
+                                && value.length() == 12) {
+                        value = value.substring(2);
+                }
+
+                return value;
         }
-
-        if (value.startsWith("91")
-                && value.length() == 12) {
-            value = value.substring(2);
-        }
-
-        return value;
-    }
 }
